@@ -50,7 +50,7 @@ Respond ONLY with valid JSON. No extra text. Format:
     "sub_tasks": ["<task1>", "<task2>"],
     "needs_retrieval": true/false,
     "retrieval_query": "<optional search query for the RAG system>",
-    "next_agent": "<agent to call: retrieval_agent | resume_review_agent | skill_gap_agent | roadmap_agent | mock_interview_agent | learning_agent | progress_agent | general_response>",
+    "next_agent": "<agent to call: retrieval_agent | resume_review_agent | skill_gap_agent | roadmap_agent | mock_interview_agent | learning_agent | general_response>",
     "reasoning": "<brief explanation of your routing decision>"
 }}
 """
@@ -127,5 +127,14 @@ def route_after_planner(state: AgentState) -> str:
     # Always retrieve first if needed
     if needs_retrieval:
         return "retrieval_agent"
+
+    # Safety: if LLM returns an agent name that doesn't exist in the graph, fallback
+    valid_agents = {
+        "retrieval_agent", "resume_review_agent", "skill_gap_agent",
+        "roadmap_agent", "mock_interview_agent", "learning_agent", "general_response",
+    }
+    if next_agent not in valid_agents:
+        logger.warning(f"[Planner] Unknown next_agent '{next_agent}', falling back to general_response")
+        return "general_response"
 
     return next_agent

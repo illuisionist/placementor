@@ -66,4 +66,13 @@ def route_after_retrieval(state: AgentState) -> str:
     """
     After retrieval, continue to the originally planned agent.
     """
-    return state.get("next_agent", "general_response")
+    next_agent = state.get("next_agent", "general_response")
+    # Safety: only route to agents that exist after retrieval
+    valid_agents = {
+        "resume_review_agent", "skill_gap_agent", "roadmap_agent",
+        "mock_interview_agent", "learning_agent", "general_response",
+    }
+    if next_agent not in valid_agents:
+        return "general_response"
+    return next_agent
+
