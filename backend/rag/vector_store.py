@@ -1,65 +1,113 @@
 """
-Vector store — Pinecone serverless (replaces ChromaDB).
+Vector store — Pinecone serverless with Google text-embedding-004.
 
-Uses sentence-transformers (all-MiniLM-L6-v2, 384-dim) for embeddings.
+Uses Google's Generative AI embedding API (768-dim) — fully remote,
+zero local model RAM. Free tier: 1500 requests/day.
+
 Each knowledge category is stored in a separate Pinecone namespace.
 """
 
 from __future__ import annotations
 
 import uuid
+import time
 from functools import lru_cache
 from typing import List, Dict, Any
 
 from loguru import logger
 
-# ─── Lazy imports (heavy models loaded only on first use) ─────────────────────
 
-@lru_cache(maxsize=1)
-def _get_embedding_model():
-    # fastembed: ONNX-based, no PyTorch, ~80MB download (vs 2GB for torch)
-    from fastembed import TextEmbedding
+# ─── Google Embedding API (no local model, no RAM cost) ──────────────────────
+
+EMBEDDING_MODEL = "models/gemini-embedding-001"
+EMBEDDING_DIM   = 768   # output_dimensionality we request
+
+
+def _make_client():
+    """Create a google-genai client (lightweight, no local model)."""
+    from google import genai
     from config import settings
-    model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    logger.info(f"Embedding model loaded via fastembed: {settings.EMBEDDING_MODEL}")
-    return model
+    return genai.Client(api_key=settings.GOOGLE_API_KEY)
+
+
+def embed(text: str) -> List[float]:
+    """
+    Embed text using Gemini embedding API (768-dim).
+    Fully remote — zero local RAM usage.
+    """
+    from google.genai import types
+    client = _make_client()
+    result = client.models.embed_content(
+        model=EMBEDDING_MODEL,
+        contents=text,
+        config=types.EmbedContentConfig(
+            task_type="RETRIEVAL_DOCUMENT",
+            output_dimensionality=EMBEDDING_DIM,
+        ),
+    )
+    return list(result.embeddings[0].values)
+
+
+def embed_query(text: str) -> List[float]:
+    """Embed a search query (uses RETRIEVAL_QUERY task type)."""
+    from google.genai import types
+    client = _make_client()
+    result = client.models.embed_content(
+        model=EMBEDDING_MODEL,
+        contents=text,
+        config=types.EmbedContentConfig(
+            task_type="RETRIEVAL_QUERY",
+            output_dimensionality=EMBEDDING_DIM,
+        ),
+    )
+    return list(result.embeddings[0].values)
+
+
+
+# ─── Pinecone Index (768-dim to match Google embeddings) ─────────────────────
+
+EMBEDDING_DIM = 768   # Google text-embedding-004
 
 
 @lru_cache(maxsize=1)
 def _get_pinecone_index():
-    import time
     from pinecone import Pinecone, ServerlessSpec
     from config import settings
 
     pc = Pinecone(api_key=settings.PINECONE_API_KEY)
     index_name = settings.PINECONE_INDEX
 
-    existing_names = [idx.name for idx in pc.list_indexes()]
-    if index_name not in existing_names:
-        logger.info(f"Creating Pinecone index '{index_name}' (dim=384, cosine, serverless)...")
+    existing = {idx.name: idx for idx in pc.list_indexes()}
+    if index_name not in existing:
+        logger.info(f"Creating Pinecone index '{index_name}' (dim={EMBEDDING_DIM}, cosine)...")
         pc.create_index(
             name=index_name,
-            dimension=384,
+            dimension=EMBEDDING_DIM,
             metric="cosine",
             spec=ServerlessSpec(cloud="aws", region="us-east-1"),
         )
-        # Wait until the index is ready (can take 60-90s on free tier)
-        logger.info("Waiting for index to become ready...")
-        for attempt in range(60):          # max 60s
-            status = pc.describe_index(index_name).status
-            if status.get("ready"):
-                logger.success(f"Index '{index_name}' is ready!")
+        # Wait for readiness
+        for _ in range(60):
+            if pc.describe_index(index_name).status.get("ready"):
+                logger.success(f"Index '{index_name}' ready!")
                 break
             time.sleep(2)
         else:
             raise TimeoutError(f"Pinecone index '{index_name}' not ready after 120s")
     else:
-        logger.info(f"Using existing Pinecone index: '{index_name}'")
+        # Check dimension matches — warn if not
+        dim = existing[index_name].dimension
+        if dim != EMBEDDING_DIM:
+            logger.warning(
+                f"Index '{index_name}' has dim={dim} but we need {EMBEDDING_DIM}. "
+                f"Delete and recreate the index in Pinecone dashboard!"
+            )
+        logger.info(f"Using existing Pinecone index: '{index_name}' (dim={dim})")
 
     return pc.Index(index_name)
 
 
-# ─── Namespace mapping (replaces ChromaDB collections) ───────────────────────
+# ─── Namespace mapping ────────────────────────────────────────────────────────
 
 NAMESPACE_MAP: Dict[str, str] = {
     "general":               "general",
@@ -75,40 +123,38 @@ def _resolve_namespace(collection: str) -> str:
 
 # ─── Public API ───────────────────────────────────────────────────────────────
 
-def embed(text: str) -> List[float]:
-    """Embed a single string → 384-dim float list using fastembed (ONNX)."""
-    model = _get_embedding_model()
-    # fastembed returns a generator; convert to list and take first result
-    embeddings = list(model.embed([text]))
-    return embeddings[0].tolist()
-
-
 def upsert_chunks(
     chunks: List[str],
     metadatas: List[Dict[str, Any]],
     namespace: str = "general",
 ) -> int:
     """
-    Embed and upsert chunks into Pinecone.
+    Embed (via Google API) and upsert chunks into Pinecone.
     Returns number of vectors upserted.
     """
     index = _get_pinecone_index()
     ns = _resolve_namespace(namespace)
 
     vectors = []
-    for chunk, meta in zip(chunks, metadatas):
+    for i, (chunk, meta) in enumerate(zip(chunks, metadatas)):
         vec_id = meta.get("id") or str(uuid.uuid4())
-        embedding = embed(chunk)
-        vectors.append({
-            "id":     vec_id,
-            "values": embedding,
-            "metadata": {**meta, "text": chunk[:2000]},  # Pinecone metadata limit
-        })
+        try:
+            embedding = embed(chunk)
+            vectors.append({
+                "id":       vec_id,
+                "values":   embedding,
+                "metadata": {**meta, "text": chunk[:2000]},
+            })
+            # Rate limit: ~1500 req/day free tier → small delay between calls
+            if i > 0 and i % 10 == 0:
+                time.sleep(0.5)
+        except Exception as e:
+            logger.warning(f"Skipping chunk {i} (embed error): {e}")
 
     # Batch upsert (Pinecone recommends ≤ 100 per batch)
-    batch_size = 100
+    batch_size = 50
     for i in range(0, len(vectors), batch_size):
-        index.upsert(vectors=vectors[i : i + batch_size], namespace=ns)
+        index.upsert(vectors=vectors[i: i + batch_size], namespace=ns)
 
     logger.debug(f"Upserted {len(vectors)} vectors → namespace '{ns}'")
     return len(vectors)
@@ -121,13 +167,13 @@ def query_collection(
     score_threshold: float = 0.3,
 ) -> List[Dict[str, Any]]:
     """
-    Query Pinecone for similar chunks.
-    Returns list of {text, score, metadata} dicts.
+    Query Pinecone for semantically similar chunks.
+    Returns list of {text, score, source, metadata} dicts.
     """
     index = _get_pinecone_index()
     ns = _resolve_namespace(namespace)
 
-    query_emb = embed(query_text)
+    query_emb = embed_query(query_text)
     results = index.query(
         vector=query_emb,
         top_k=top_k,
@@ -135,43 +181,37 @@ def query_collection(
         include_metadata=True,
     )
 
-    hits = []
-    for match in results.matches:
-        if match.score >= score_threshold:
-            hits.append({
-                "text":     match.metadata.get("text", ""),
-                "score":    round(match.score, 4),
-                "source":   match.metadata.get("source", ""),
-                "metadata": match.metadata,
-            })
-
-    return hits
+    return [
+        {
+            "text":     match.metadata.get("text", ""),
+            "score":    round(match.score, 4),
+            "source":   match.metadata.get("source_file", match.metadata.get("source", "KB")),
+            "metadata": match.metadata,
+        }
+        for match in results.matches
+        if match.score >= score_threshold
+    ]
 
 
 def query_all_namespaces(
     query_text: str,
     top_k: int = 3,
 ) -> List[Dict[str, Any]]:
-    """Query across all namespaces and merge results."""
+    """Query across all namespaces and return merged, re-ranked results."""
     all_results = []
     for ns in NAMESPACE_MAP.values():
-        hits = query_collection(query_text, namespace=ns, top_k=top_k)
-        all_results.extend(hits)
-
-    # Sort by score descending
+        all_results.extend(query_collection(query_text, namespace=ns, top_k=top_k))
     all_results.sort(key=lambda x: x["score"], reverse=True)
-    return all_results[:top_k * 2]
+    return all_results[: top_k * 2]
 
 
 def delete_namespace(namespace: str) -> None:
     """Delete all vectors in a namespace (for re-seeding)."""
     index = _get_pinecone_index()
-    ns = _resolve_namespace(namespace)
-    index.delete(delete_all=True, namespace=ns)
-    logger.info(f"Deleted all vectors in namespace '{ns}'")
+    index.delete(delete_all=True, namespace=_resolve_namespace(namespace))
+    logger.info(f"Deleted all vectors in namespace '{namespace}'")
 
 
 def get_index_stats() -> Dict[str, Any]:
-    """Return index statistics."""
-    index = _get_pinecone_index()
-    return index.describe_index_stats()
+    """Return Pinecone index statistics."""
+    return _get_pinecone_index().describe_index_stats()
