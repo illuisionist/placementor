@@ -23,6 +23,7 @@ from routers.auth import router as auth_router
 from routers.student import router as student_router
 from routers.chat import router as chat_router
 from routers.resume import router as resume_router
+from routers.admin import router as admin_router
 
 
 # ─── Lifespan (startup / shutdown) ───────────────────────────────────────────
@@ -75,6 +76,8 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
         "http://localhost:8000",
+        "https://*.vercel.app",     # Vercel deployments
+        "https://*.onrender.com",   # Render deployments
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -87,6 +90,7 @@ app.include_router(auth_router,    prefix="/api/v1")
 app.include_router(student_router, prefix="/api/v1")
 app.include_router(chat_router,    prefix="/api/v1")
 app.include_router(resume_router,  prefix="/api/v1")
+app.include_router(admin_router)   # no /api/v1 prefix — internal only
 
 
 # ─── Health Check ────────────────────────────────────────────────────────────
