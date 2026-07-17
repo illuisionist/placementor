@@ -192,18 +192,27 @@ export const ChatAPI = {
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
 
+      let buffer = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const text = decoder.decode(value);
-        for (const line of text.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
+        buffer += decoder.decode(value, { stream: true });
+        
+        const lines = buffer.split('\n');
+        // Keep the last incomplete line in the buffer
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) continue;
           try {
-            const event = JSON.parse(line.slice(6));
+            const event = JSON.parse(trimmed.slice(6));
             if (event.type === 'token') onToken(event.content);
             else if (event.type === 'done' || event.type === 'meta') onDone?.(event);
             else if (event.type === 'error') onError?.(event.content);
-          } catch {}
+          } catch (e) {
+            // Ignore incomplete JSON chunks (though buffering should prevent this now)
+          }
         }
       }
     } catch (err) {
