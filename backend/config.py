@@ -24,6 +24,24 @@ class Settings(BaseSettings):
                 "ASYNC_POSTGRES_URL",
                 self.POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
             )
+            
+        # Robustly handle Upstash copy-paste errors for REDIS_URL
+        raw_redis = self.REDIS_URL
+        if "redis-cli" in raw_redis:
+            # Extract just the rediss://... part from 'redis-cli --tls -u rediss://...'
+            import re
+            match = re.search(r'(redis[s]?://\S+)', raw_redis)
+            if match:
+                raw_redis = match.group(1)
+        
+        # Remove any surrounding quotes
+        raw_redis = raw_redis.strip('"').strip("'")
+        
+        # Ensure rediss:// for Upstash (requires TLS)
+        if "upstash.io" in raw_redis and raw_redis.startswith("redis://"):
+            raw_redis = raw_redis.replace("redis://", "rediss://")
+            
+        object.__setattr__(self, "REDIS_URL", raw_redis)
 
     # ── Redis ─────────────────────────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379"
