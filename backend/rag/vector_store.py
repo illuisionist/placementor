@@ -27,6 +27,7 @@ def _get_embedding_model():
 
 @lru_cache(maxsize=1)
 def _get_pinecone_index():
+    import time
     from pinecone import Pinecone, ServerlessSpec
     from config import settings
 
@@ -35,14 +36,23 @@ def _get_pinecone_index():
 
     existing_names = [idx.name for idx in pc.list_indexes()]
     if index_name not in existing_names:
-        logger.info(f"Creating Pinecone index '{index_name}' (dim=384, cosine)...")
+        logger.info(f"Creating Pinecone index '{index_name}' (dim=384, cosine, serverless)...")
         pc.create_index(
             name=index_name,
             dimension=384,
             metric="cosine",
             spec=ServerlessSpec(cloud="aws", region="us-east-1"),
         )
-        logger.success(f"Index '{index_name}' created.")
+        # Wait until the index is ready (can take 60-90s on free tier)
+        logger.info("Waiting for index to become ready...")
+        for attempt in range(60):          # max 60s
+            status = pc.describe_index(index_name).status
+            if status.get("ready"):
+                logger.success(f"Index '{index_name}' is ready!")
+                break
+            time.sleep(2)
+        else:
+            raise TimeoutError(f"Pinecone index '{index_name}' not ready after 120s")
     else:
         logger.info(f"Using existing Pinecone index: '{index_name}'")
 
