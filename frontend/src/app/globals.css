@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  --bg:        #0a0d14;
+  --bg2:       #0f1520;
+  --bg3:       #161d2e;
+  --purple:    #7c3aed;
+  --purple-l:  #a855f7;
+  --cyan:      #06b6d4;
+  --cyan-l:    #67e8f9;
+  --green:     #10b981;
+  --amber:     #f59e0b;
+  --red:       #ef4444;
+  --border:    rgba(255,255,255,0.07);
+  --border2:   rgba(255,255,255,0.12);
+  --text:      #f1f5f9;
+  --text-2:    #94a3b8;
+  --text-3:    #475569;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 100px; }
+::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+/* Gradient text utility */
+.gradient-text {
+  background: linear-gradient(135deg, #a855f7, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Typing dots animation */
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-5px); }
+}
+.typing-dot {
+  width: 7px; height: 7px;
+  background: #475569;
+  border-radius: 50%;
+  animation: bounce 1.2s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.3s ease forwards; }
+
+/* Pulse glow */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(124,58,237,0.4); }
+  50%       { box-shadow: 0 0 20px rgba(124,58,237,0.7); }
+}
+.pulse-glow { animation: pulse-glow 2s infinite; }
+
+/* Chat message prose */
+.prose-chat p { margin-bottom: 6px; }
+.prose-chat ul { margin: 6px 0 6px 18px; list-style: disc; }
+.prose-chat li { margin-bottom: 3px; }
+.prose-chat strong { font-weight: 700; color: #f1f5f9; }
