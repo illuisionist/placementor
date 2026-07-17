@@ -1,20 +1,18 @@
-#!/usr/bin/env python3
 """
-Build-time script: pre-downloads the sentence-transformers model
+Build-time script: pre-downloads the fastembed ONNX model (~80MB)
 so it's cached in the container image (avoids cold-start download).
 
-Run automatically during Render build via build command.
+Run during Render build: pip install -r requirements.txt && python preload_model.py
 """
-import os
 
 def preload_model():
-    model_name = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-    print(f"Pre-loading embedding model: {model_name}")
+    print("Pre-loading fastembed ONNX embedding model (~80MB)...")
     try:
-        from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer(model_name)
-        dim = model.get_sentence_embedding_dimension() if hasattr(model, 'get_sentence_embedding_dimension') else model.get_embedding_dimension()
-        print(f"Model loaded OK — dim={dim}")
+        from fastembed import TextEmbedding
+        model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        # Force download by running one embed
+        result = list(model.embed(["PlaceMentor AI preload test"]))
+        print(f"Model loaded OK — embedding dim: {len(result[0])}")
     except Exception as e:
         print(f"Warning: Could not preload model: {e}")
 

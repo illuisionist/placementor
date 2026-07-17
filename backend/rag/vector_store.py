@@ -17,10 +17,11 @@ from loguru import logger
 
 @lru_cache(maxsize=1)
 def _get_embedding_model():
-    from sentence_transformers import SentenceTransformer
+    # fastembed: ONNX-based, no PyTorch, ~80MB download (vs 2GB for torch)
+    from fastembed import TextEmbedding
     from config import settings
-    model = SentenceTransformer(settings.EMBEDDING_MODEL)
-    logger.info(f"Embedding model loaded: {settings.EMBEDDING_MODEL}")
+    model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    logger.info(f"Embedding model loaded via fastembed: {settings.EMBEDDING_MODEL}")
     return model
 
 
@@ -65,9 +66,11 @@ def _resolve_namespace(collection: str) -> str:
 # ─── Public API ───────────────────────────────────────────────────────────────
 
 def embed(text: str) -> List[float]:
-    """Embed a single string → 384-dim float list."""
+    """Embed a single string → 384-dim float list using fastembed (ONNX)."""
     model = _get_embedding_model()
-    return model.encode(text, normalize_embeddings=True).tolist()
+    # fastembed returns a generator; convert to list and take first result
+    embeddings = list(model.embed([text]))
+    return embeddings[0].tolist()
 
 
 def upsert_chunks(

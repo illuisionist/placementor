@@ -28,7 +28,8 @@ langsmith>=0.1.77
 # ─── RAG / Vector Store ───────────────────────────────────────────────
 # Pinecone serverless (replaces ChromaDB — no Docker needed)
 pinecone>=3.2.2
-sentence-transformers>=3.0.0
+# fastembed: ONNX-based embeddings, no PyTorch needed (~80MB vs 2GB)
+fastembed>=0.4.0
 pypdf>=4.2.0
 docx2txt>=0.8
 tiktoken>=0.7.0
