@@ -200,6 +200,8 @@ async def chat_stream(
             if final_state.get("resume_review"):
                 await _save_resume_review(db, user_id, final_state["resume_review"])
 
+            await db.commit()
+
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
 
@@ -231,7 +233,7 @@ async def _save_roadmap(db, user_id: str, roadmap: dict, target_company: str = N
         is_active=True,
     )
     db.add(new_roadmap)
-    await db.flush()
+    await db.commit()
 
 
 async def _save_skill_gap(db, user_id: str, skill_gap: dict):
@@ -247,7 +249,7 @@ async def _save_skill_gap(db, user_id: str, skill_gap: dict):
         priority_order=skill_gap.get("priority_action_plan", []),
     )
     db.add(sg)
-    await db.flush()
+    await db.commit()
 
 
 async def _save_resume_review(db, user_id: str, review: dict):
@@ -267,3 +269,4 @@ async def _save_resume_review(db, user_id: str, review: dict):
                 raw_review=str(review),
             )
         )
+        await db.commit()
