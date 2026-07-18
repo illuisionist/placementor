@@ -186,6 +186,20 @@ async def chat_stream(
             await short_term_memory.append_message(user_id, "user", payload.message)
             await short_term_memory.append_message(user_id, "assistant", response_text)
 
+            # Persist interview state if active
+            if final_state.get("_interview_state"):
+                await short_term_memory.set_interview_state(user_id, final_state["_interview_state"])
+
+            # Persist roadmap/skill gaps to DB if generated
+            if final_state.get("roadmap"):
+                await _save_roadmap(db, user_id, final_state["roadmap"], payload.target_company, payload.target_role)
+
+            if final_state.get("skill_gap"):
+                await _save_skill_gap(db, user_id, final_state["skill_gap"])
+
+            if final_state.get("resume_review"):
+                await _save_resume_review(db, user_id, final_state["resume_review"])
+
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
 
