@@ -46,6 +46,7 @@ function WeekCard({
   isCurrent: boolean;
   isExpanded: boolean;
   onToggle: () => void;
+  onToggleTask?: (taskIndex: number, isCompleted: boolean) => void;
 }) {
   return (
     <div
@@ -174,7 +175,12 @@ function WeekCard({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
                 {week.checklist.map((item, i) => (
                   <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
-                    <input type="checkbox" defaultChecked={item.is_completed} style={{ marginTop: 2, accentColor: '#f43f5e', flexShrink: 0 }} />
+                    <input 
+                      type="checkbox" 
+                      checked={item.is_completed} 
+                      onChange={(e) => onToggleTask?.(i, e.target.checked)}
+                      style={{ marginTop: 2, accentColor: '#f43f5e', flexShrink: 0 }} 
+                    />
                     <span style={{ color: item.is_completed ? 'var(--text-2)' : 'var(--text)', textDecoration: item.is_completed ? 'line-through' : 'none', fontSize: 13, lineHeight: 1.4 }}>{item.task}</span>
                   </label>
                 ))}
@@ -317,6 +323,45 @@ export default function RoadmapPage() {
     });
   }
 
+  async function handleToggleTask(weekNum: number, taskIdx: number, isCompleted: boolean) {
+    if (!roadmap) return;
+    
+    // Optimistic UI update
+    setRoadmap((prev) => {
+      if (!prev) return prev;
+      const nextWeeks = prev.weeks_plan?.map((w) => {
+        if (w.week !== weekNum) return w;
+        const nextChecklist = [...(w.checklist || [])];
+        if (nextChecklist[taskIdx]) {
+          nextChecklist[taskIdx] = { ...nextChecklist[taskIdx], is_completed: isCompleted };
+        }
+        return { ...w, checklist: nextChecklist };
+      });
+      return { ...prev, weeks_plan: nextWeeks };
+    });
+
+    try {
+      const res = await StudentAPI.updateChecklist(weekNum, taskIdx, isCompleted) as any;
+      // Sync progress and week from server
+      setRoadmap((prev) => {
+        if (!prev) return prev;
+        return { ...prev, completion_pct: res.completion_pct, current_week: res.current_week };
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("Are you sure you want to redesign your roadmap? This will delete the current one.")) return;
+    try {
+      await StudentAPI.deleteRoadmap();
+      setRoadmap(null);
+    } catch (e) {
+      alert("Failed to delete roadmap");
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '40px 24px' }}>
@@ -445,24 +490,40 @@ export default function RoadmapPage() {
         </div>
 
         {/* Expand all */}
-        <button
-          onClick={() => {
-            if (expanded.size === weeks.length) setExpanded(new Set());
-            else setExpanded(new Set(weeks.map((w) => w.week)));
-          }}
-          style={{
-            background: 'var(--bg3)',
-            border: '1px solid var(--border2)',
-            borderRadius: 10,
-            padding: '8px 14px',
-            color: 'var(--text-2)',
-            fontSize: 12,
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          {expanded.size === weeks.length ? 'Collapse All' : 'Expand All'}
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+          <button
+            onClick={() => {
+              if (expanded.size === weeks.length) setExpanded(new Set());
+              else setExpanded(new Set(weeks.map((w) => w.week)));
+            }}
+            style={{
+              background: 'var(--bg3)',
+              border: '1px solid var(--border2)',
+              borderRadius: 10,
+              padding: '8px 14px',
+              color: 'var(--text-2)',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            {expanded.size === weeks.length ? 'Collapse All' : 'Expand All'}
+          </button>
+          
+          <button
+            onClick={handleDelete}
+            style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              borderRadius: 10,
+              padding: '8px 14px',
+              color: '#ef4444',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            🗑️ Redesign Roadmap
+          </button>
+        </div>
       </div>
 
       {/* Week Cards */}
@@ -479,6 +540,7 @@ export default function RoadmapPage() {
               isCurrent={w.week === roadmap.current_week}
               isExpanded={expanded.has(w.week)}
               onToggle={() => toggleWeek(w.week)}
+              onToggleTask={(taskIdx, isCompleted) => handleToggleTask(w.week, taskIdx, isCompleted)}
             />
           ))
         )}

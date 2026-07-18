@@ -164,6 +164,12 @@ export const AuthAPI = {
 export const StudentAPI = {
   getProfile: () => req<{ profile: StudentProfile; user: User }>('/students/me'),
   getRoadmap: () => req<Roadmap>('/students/me/roadmap'),
+  updateChecklist: (week: number, taskIndex: number, isCompleted: boolean) =>
+    req('/students/me/roadmap/checklist', {
+      method: 'PATCH',
+      body: JSON.stringify({ week, task_index: taskIndex, is_completed: isCompleted }),
+    }),
+  deleteRoadmap: () => req('/students/me/roadmap', { method: 'DELETE' }),
   getInterviews: () => req<{ interviews: MockInterview[]; total_interviews: number; average_score?: number }>('/students/me/interviews'),
   updateProfile: (data: Partial<StudentProfile>) =>
     req('/students/me/profile', { method: 'PATCH', body: JSON.stringify(data) }),
