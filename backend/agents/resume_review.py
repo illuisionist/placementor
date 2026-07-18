@@ -9,7 +9,7 @@ import json
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from agents.state import AgentState
-from agents.llm_factory import get_gemini_llm
+from agents.llm_factory import get_groq_llm
 from loguru import logger
 
 RESUME_REVIEW_SYSTEM = """You are an expert resume reviewer and ATS specialist for campus placements.
@@ -62,7 +62,7 @@ async def resume_review_agent(state: AgentState, resume_text: str = None,
     LangGraph node: Resume Review Agent.
     Uses Gemini for large-context resume analysis.
     """
-    llm = get_gemini_llm()
+    llm = get_groq_llm()
 
     student_ctx = json.dumps(state.get("student_context") or {}, indent=2)
     
