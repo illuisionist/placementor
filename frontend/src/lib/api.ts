@@ -46,8 +46,18 @@ export interface RoadmapWeek {
   week: number;
   theme?: string;
   goals?: string[];
-  dsa?: { topics?: string[]; problems_target?: number };
-  core_subjects?: { subject: string; topics?: string[] }[];
+  checklist?: { task: string; is_completed: boolean }[];
+  dsa?: { 
+    topics?: string[]; 
+    problems_target?: number;
+    resources?: { title: string; url: string }[];
+  };
+  core_subjects?: { 
+    subject: string; 
+    topics?: string[];
+    resource_title?: string;
+    resource_url?: string;
+  }[];
   aptitude?: string;
   projects?: string;
   mock_interview?: boolean;

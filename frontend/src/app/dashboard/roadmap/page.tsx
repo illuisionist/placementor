@@ -168,6 +168,20 @@ function WeekCard({
             </Section>
           )}
 
+          {/* Checklist */}
+          {week.checklist && week.checklist.length > 0 && (
+            <Section title="📝 Action Items" accent="#f43f5e">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                {week.checklist.map((item, i) => (
+                  <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={item.is_completed} readOnly style={{ marginTop: 2, accentColor: '#f43f5e', flexShrink: 0 }} />
+                    <span style={{ color: item.is_completed ? 'var(--text-2)' : 'var(--text)', textDecoration: item.is_completed ? 'line-through' : 'none', fontSize: 13, lineHeight: 1.4 }}>{item.task}</span>
+                  </label>
+                ))}
+              </div>
+            </Section>
+          )}
+
           {/* DSA */}
           {week.dsa && (
             <Section title="💻 DSA" accent="#0ea5e9">
@@ -185,6 +199,18 @@ function WeekCard({
                   Target: <strong style={{ color: 'var(--text)' }}>{week.dsa.problems_target} problems</strong>
                 </div>
               )}
+              {week.dsa.resources && week.dsa.resources.length > 0 && (
+                <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Resources</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {week.dsa.resources.map((res, i) => (
+                      <a key={i} href={res.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#38bdf8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        🔗 <span>{res.title}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </Section>
           )}
 
@@ -197,6 +223,13 @@ function WeekCard({
                   {cs.topics && cs.topics.length > 0 && (
                     <div style={{ color: 'var(--text-2)', fontSize: 12, marginTop: 2 }}>
                       {cs.topics.join(', ')}
+                    </div>
+                  )}
+                  {cs.resource_url && (
+                    <div style={{ marginTop: 4 }}>
+                      <a href={cs.resource_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#34d399', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        🔗 {cs.resource_title || 'View Resource'}
+                      </a>
                     </div>
                   )}
                 </div>
