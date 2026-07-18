@@ -41,6 +41,7 @@ function WeekCard({
   isCurrent,
   isExpanded,
   onToggle,
+  onToggleTask,
 }: {
   week: RoadmapWeek;
   isCurrent: boolean;
