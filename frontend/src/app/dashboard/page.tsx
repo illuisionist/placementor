@@ -323,7 +323,7 @@ export default function DashboardPage() {
             <QuickAction href="/dashboard/interview" icon="🎤" label="Mock Interview" desc="Practice with AI interviewer" accent="linear-gradient(135deg,#10b981,#059669)" />
             <QuickAction href="/dashboard/resume" icon="📄" label="Resume Analyzer" desc="Upload & get ATS feedback" accent="linear-gradient(135deg,#f59e0b,#d97706)" />
             <QuickAction href="/dashboard/profile" icon="👤" label="Edit Profile" desc="Update skills & preferences" accent="linear-gradient(135deg,#ec4899,#db2777)" />
-            <QuickAction href="/dashboard/resources" icon="📚" label="Resources" desc="DSA sheets, guides & more" accent="linear-gradient(135deg,#6366f1,#4f46e5)" />
+            <QuickAction href="/dashboard/chat" icon="📚" label="AI Resources" desc="DSA sheets, guides & more" accent="linear-gradient(135deg,#6366f1,#4f46e5)" />
           </div>
         </div>
 

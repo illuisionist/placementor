@@ -4,6 +4,7 @@ Resume upload router — handles file upload, text extraction, and triggers resu
 
 import os
 import uuid
+import asyncio
 import aiofiles
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,11 +15,57 @@ from database.models import User, Resume
 from auth import get_current_user
 from config import settings
 from memory.long_term import long_term_memory
+from agents.llm_factory import get_groq_llm
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
 
 router = APIRouter(prefix="/resume", tags=["Resume"])
 
 ALLOWED_TYPES = {"application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
 ALLOWED_EXTENSIONS = {".pdf", ".docx"}
+
+
+async def _run_ats_analysis(resume_id: str, extracted_text: str):
+    """Background task: Run ATS analysis on uploaded resume."""
+    from database.session import AsyncSessionLocal
+    try:
+        llm = get_groq_llm()
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an expert ATS (Applicant Tracking System) resume analyzer.
+Analyze the following resume text and provide a detailed evaluation.
+
+Respond ONLY with valid JSON:
+{{
+    "ats_score": <number 0-100>,
+    "strengths": ["<strength1>", "<strength2>", ...],
+    "weaknesses": ["<weakness1>", "<weakness2>", ...],
+    "suggestions": [
+        {{"priority": "HIGH", "suggestion": "<text>", "fix": "<how to fix>"}},
+        {{"priority": "MEDIUM", "suggestion": "<text>", "fix": "<how to fix>"}},
+        {{"priority": "LOW", "suggestion": "<text>", "fix": "<how to fix>"}}
+    ]
+}}"""),
+            ("human", "Resume text:\n{resume_text}")
+        ])
+        chain = prompt | llm | JsonOutputParser()
+        result = await chain.ainvoke({"resume_text": extracted_text[:4000]})
+
+        async with AsyncSessionLocal() as db:
+            from database.models import Resume
+            from sqlalchemy import update
+            await db.execute(
+                update(Resume).where(Resume.id == resume_id).values(
+                    ats_score=result.get("ats_score"),
+                    strengths=result.get("strengths", []),
+                    weaknesses=result.get("weaknesses", []),
+                    suggestions=result.get("suggestions", []),
+                    raw_review=str(result),
+                )
+            )
+            await db.commit()
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"ATS analysis failed for resume {resume_id}: {e}")
 
 
 async def extract_text(file_path: str) -> str:
@@ -47,6 +94,7 @@ async def upload_resume(
     """
     Upload a resume (PDF or DOCX).
     Saves file, extracts text, deactivates old resumes, and stores in DB.
+    Triggers automatic ATS analysis in the background.
     """
     # Validate file type
     ext = os.path.splitext(file.filename)[1].lower()
@@ -88,9 +136,16 @@ async def upload_resume(
     db.add(resume)
     await db.flush()
 
+    # Store extracted text on the resume record
+    resume.extracted_text = text
+    await db.commit()
+
+    # Trigger background ATS analysis
+    asyncio.create_task(_run_ats_analysis(str(resume.id), text))
+
     return {
         "message": "Resume uploaded successfully!",
-        "resume_id": resume.id,
+        "resume_id": str(resume.id),
         "version": version,
         "file_name": file.filename,
         "text_length": len(text),
@@ -113,6 +168,9 @@ async def list_resumes(
             "original_name": r.original_name,
             "is_active": r.is_active,
             "ats_score": r.ats_score,
+            "strengths": r.strengths or [],
+            "weaknesses": r.weaknesses or [],
+            "suggestions": r.suggestions or [],
             "uploaded_at": r.uploaded_at,
         }
         for r in resumes

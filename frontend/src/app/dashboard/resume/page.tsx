@@ -125,6 +125,20 @@ export default function ResumePage() {
       const list = await ResumeAPI.list();
       const active = list.find((r) => r.is_active) ?? list[0] ?? null;
       setActiveResume(active);
+      // Poll for ATS results (background analysis takes a few seconds)
+      let pollCount = 0;
+      const pollInterval = setInterval(async () => {
+        pollCount++;
+        if (pollCount > 10) { clearInterval(pollInterval); return; }
+        try {
+          const resumes = await ResumeAPI.list();
+          const polledActive = resumes.find((r: Resume) => r.is_active);
+          if (polledActive?.ats_score) {
+            setActiveResume(polledActive);
+            clearInterval(pollInterval);
+          }
+        } catch {}
+      }, 3000);
     } catch (e) {
       setUploadError((e as Error).message ?? 'Upload failed. Please try again.');
     } finally {

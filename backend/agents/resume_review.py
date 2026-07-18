@@ -65,7 +65,20 @@ async def resume_review_agent(state: AgentState, resume_text: str = None,
     llm = get_gemini_llm()
 
     student_ctx = json.dumps(state.get("student_context") or {}, indent=2)
-    resume = resume_text or state.get("_resume_text", "No resume text provided.")
+    
+    # Try to get resume text: first from explicit override, then from student_context
+    resume = resume_text or state.get("_resume_text")
+    if not resume:
+        ctx = state.get("student_context") or {}
+        resume = (ctx.get("resume") or {}).get("extracted_text_preview")
+    resume = resume or "No resume text available. Please upload your resume first via the Resume page."
+
+    # Extract target from context
+    ctx = state.get("student_context") or {}
+    companies = (ctx.get("profile") or {}).get("preferred_companies") or []
+    domains = (ctx.get("profile") or {}).get("preferred_domains") or []
+    auto_target_company = target_company or (companies[0] if companies else "top product companies")
+    auto_target_role = target_role or (domains[0] if domains else "Software Engineer")
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", RESUME_REVIEW_SYSTEM),
@@ -78,8 +91,8 @@ async def resume_review_agent(state: AgentState, resume_text: str = None,
         result = await chain.ainvoke({
             "student_context": student_ctx,
             "resume_text": resume,
-            "target_role": target_role or "Software Engineer",
-            "target_company": target_company or "top product companies",
+            "target_role": auto_target_role,
+            "target_company": auto_target_company,
         })
 
         logger.info(f"[ResumeReview] ATS Score: {result.get('ats_score')}")

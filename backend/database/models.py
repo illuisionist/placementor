@@ -125,6 +125,7 @@ class Resume(Base):
     weaknesses      = Column(JSON, default=list)
     suggestions     = Column(JSON, default=list)
     raw_review      = Column(Text, nullable=True)
+    extracted_text  = Column(Text, nullable=True)
 
     uploaded_at     = Column(DateTime(timezone=True), server_default=func.now())
 

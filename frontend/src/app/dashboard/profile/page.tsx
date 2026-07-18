@@ -8,21 +8,41 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Raw text state — only converted to arrays on save (fixes cursor jump bug)
+  const [skillsText, setSkillsText] = useState('');
+  const [companiesText, setCompaniesText] = useState('');
+  const [domainsText, setDomainsText] = useState('');
+
   useEffect(() => {
     StudentAPI.getProfile()
-      .then(d => setProfile(d.profile || {}))
+      .then(d => {
+        const p = d.profile || {};
+        setProfile(p);
+        setSkillsText((p.skills || []).join(', '));
+        setCompaniesText((p.preferred_companies || []).join(', '));
+        setDomainsText((p.preferred_domains || []).join(', '));
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const toList = (val: string): string[] => val ? val.split(',').map(s => s.trim()).filter(Boolean) : [];
-  const fromList = (arr?: string[]): string => (arr || []).join(', ');
+  const toList = (val: string): string[] =>
+    val ? val.split(',').map(s => s.trim()).filter(Boolean) : [];
 
   const save = async () => {
     setSaving(true);
     setMsg(null);
     try {
-      await StudentAPI.updateProfile(profile);
+      // Convert raw text to arrays only at save time (not on every keystroke)
+      const toSave = {
+        ...profile,
+        skills: toList(skillsText),
+        preferred_companies: toList(companiesText),
+        preferred_domains: toList(domainsText),
+      };
+      await StudentAPI.updateProfile(toSave);
+      // Sync profile state with saved arrays
+      setProfile(toSave);
       setMsg({ type: 'success', text: '✅ Profile saved successfully!' });
     } catch (e) {
       setMsg({ type: 'error', text: `❌ ${(e as Error).message}` });
@@ -41,6 +61,27 @@ export default function ProfilePage() {
   const inputClass = "w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-all focus:ring-2 focus:ring-purple-500/40";
   const inputStyle = { background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' };
   const labelClass = "block text-xs font-semibold text-slate-400 mb-1.5";
+
+  // Pill preview for comma-separated fields
+  const PillPreview = ({ text }: { text: string }) => {
+    const items = toList(text);
+    if (!items.length) return null;
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+        {items.map((item, i) => (
+          <span key={i} style={{
+            background: 'rgba(124,58,237,0.15)',
+            border: '1px solid rgba(124,58,237,0.3)',
+            color: '#a78bfa',
+            borderRadius: 20,
+            padding: '2px 10px',
+            fontSize: 11,
+            fontWeight: 600,
+          }}>{item}</span>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="fade-in">
@@ -71,21 +112,46 @@ export default function ProfilePage() {
             <input type="number" className={inputClass} style={inputStyle} placeholder="e.g. 2025"
               value={profile.graduation_year || ''} onChange={e => setProfile(p => ({ ...p, graduation_year: +e.target.value }))} />
           </div>
+
+          {/* Skills — raw text input, no cursor jump */}
           <div className="col-span-2">
-            <label className={labelClass}>Skills (comma separated)</label>
-            <input className={inputClass} style={inputStyle} placeholder="Python, DSA, React, SQL, Machine Learning"
-              value={fromList(profile.skills)} onChange={e => setProfile(p => ({ ...p, skills: toList(e.target.value) }))} />
+            <label className={labelClass}>Skills <span style={{ color: '#6b7280', fontWeight: 400 }}>(type comma-separated)</span></label>
+            <input
+              className={inputClass}
+              style={inputStyle}
+              placeholder="Python, DSA, React, SQL, Machine Learning"
+              value={skillsText}
+              onChange={e => setSkillsText(e.target.value)}
+            />
+            <PillPreview text={skillsText} />
           </div>
+
+          {/* Target Companies */}
           <div className="col-span-2">
-            <label className={labelClass}>Target Companies (comma separated)</label>
-            <input className={inputClass} style={inputStyle} placeholder="Amazon, Microsoft, Google, Infosys"
-              value={fromList(profile.preferred_companies)} onChange={e => setProfile(p => ({ ...p, preferred_companies: toList(e.target.value) }))} />
+            <label className={labelClass}>Target Companies <span style={{ color: '#6b7280', fontWeight: 400 }}>(type comma-separated)</span></label>
+            <input
+              className={inputClass}
+              style={inputStyle}
+              placeholder="Amazon, Microsoft, Google, Infosys"
+              value={companiesText}
+              onChange={e => setCompaniesText(e.target.value)}
+            />
+            <PillPreview text={companiesText} />
           </div>
+
+          {/* Preferred Domains */}
           <div className="col-span-2">
-            <label className={labelClass}>Preferred Domains (comma separated)</label>
-            <input className={inputClass} style={inputStyle} placeholder="SDE, Data Science, DevOps"
-              value={fromList(profile.preferred_domains)} onChange={e => setProfile(p => ({ ...p, preferred_domains: toList(e.target.value) }))} />
+            <label className={labelClass}>Preferred Domains <span style={{ color: '#6b7280', fontWeight: 400 }}>(type comma-separated)</span></label>
+            <input
+              className={inputClass}
+              style={inputStyle}
+              placeholder="SDE, Data Science, DevOps"
+              value={domainsText}
+              onChange={e => setDomainsText(e.target.value)}
+            />
+            <PillPreview text={domainsText} />
           </div>
+
           <div>
             <label className={labelClass}>LeetCode Handle</label>
             <input className={inputClass} style={inputStyle} placeholder="your_leetcode_handle"

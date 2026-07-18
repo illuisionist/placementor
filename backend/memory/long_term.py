@@ -142,6 +142,7 @@ class LongTermMemory:
         roadmap = await self.get_active_roadmap(db, user_id)
         avg_score = await self.get_average_interview_score(db, user_id)
         skill_gap = await self.get_latest_skill_gap(db, user_id)
+        resume = await self.get_active_resume(db, user_id)
 
         return {
             "profile": {
@@ -164,6 +165,13 @@ class LongTermMemory:
             "skill_gaps": {
                 "missing_skills": skill_gap.missing_skills if skill_gap else [],
                 "weak_subjects": skill_gap.weak_subjects if skill_gap else [],
+            },
+            "resume": {
+                "has_resume": resume is not None,
+                "ats_score": resume.ats_score if resume else None,
+                "strengths": resume.strengths if resume else [],
+                "weaknesses": resume.weaknesses if resume else [],
+                "extracted_text_preview": (resume.extracted_text[:2000] if resume and resume.extracted_text else None),
             },
         }
 
