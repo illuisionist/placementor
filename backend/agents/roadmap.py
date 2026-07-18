@@ -20,8 +20,9 @@ Guidelines:
 - Be specific about daily/weekly tasks, not vague suggestions.
 - Prioritize critical skill gaps first.
 - Balance: DSA (40%), Core CS (25%), Projects (20%), Aptitude (10%), Soft Skills (5%)
-- Include specific LeetCode problem categories, not just "practice coding"
-- Suggest free resources (YouTube, GeeksforGeeks, NeetCode, etc.)
+- Include specific LeetCode problem categories AND provide actual URL links to LeetCode patterns or problems.
+- Suggest actual URL links for free resources (YouTube video links, Medium articles, GeeksforGeeks, NeetCode, etc.) for every topic.
+- Include an actionable checklist of concrete tasks to accomplish the weekly goals.
 - Include checkpoints for mock interviews (every 2 weeks)
 - Adjust difficulty based on CGPA and current skill level
 
@@ -47,13 +48,19 @@ Respond ONLY with valid JSON:
             "week": 1,
             "theme": "<week theme>",
             "goals": ["<goal1>", "<goal2>"],
+            "checklist": [
+                {{"task": "<concrete actionable task>", "is_completed": false}}
+            ],
             "dsa": {{
                 "topics": ["<topic1>"],
                 "problems_target": <number>,
-                "problem_types": ["Easy", "Medium"]
+                "problem_types": ["Easy", "Medium"],
+                "resources": [
+                    {{"title": "<title>", "url": "<URL to leetcode/youtube/article>"}}
+                ]
             }},
             "core_subjects": [
-                {{"subject": "<subject>", "topics": ["<topic>"], "resource": "<resource URL/name>"}}
+                {{"subject": "<subject>", "topics": ["<topic>"], "resource_title": "<name>", "resource_url": "<URL to youtube/article>"}}
             ],
             "projects": "<project task or null>",
             "aptitude": "<aptitude focus area>",
@@ -66,10 +73,10 @@ Respond ONLY with valid JSON:
         {{"week": <n>, "milestone": "<what should be achieved"}}
     ],
     "resources": {{
-        "dsa": ["<resource1>", "<resource2>"],
-        "system_design": ["<resource1>"],
-        "aptitude": ["<resource1>"],
-        "core_cs": ["<resource1>"]
+        "dsa": [{{"title": "<title>", "url": "<url>"}}],
+        "system_design": [{{"title": "<title>", "url": "<url>"}}],
+        "aptitude": [{{"title": "<title>", "url": "<url>"}}],
+        "core_cs": [{{"title": "<title>", "url": "<url>"}}]
     }},
     "daily_schedule_template": {{
         "weekday_hours": <hours>,
@@ -122,13 +129,21 @@ async def roadmap_agent(state: AgentState, weeks_available: int = 8,
         week_summaries = []
         for w in weeks[:3]:
             dsa_info = w.get("dsa", {})
+            checklist_items = w.get("checklist", [])
+            checklist_preview = f"✅ Tasks: {len(checklist_items)} action items\n" if checklist_items else ""
             week_summaries.append(
                 f"**Week {w['week']}: {w.get('theme', '')}**\n"
                 f"🎯 Goals: {', '.join(w.get('goals', []))}\n"
                 f"💻 DSA: {', '.join(dsa_info.get('topics', []))} ({dsa_info.get('problems_target', 0)} problems)\n"
                 f"📚 Core: {', '.join(cs.get('subject', '') for cs in w.get('core_subjects', []))}\n"
+                + checklist_preview +
                 f"📌 Checkpoint: {w.get('checkpoint', '')}"
             )
+
+        def format_resource(r):
+            if isinstance(r, dict):
+                return f"[{r.get('title', 'Link')}]({r.get('url', '#')})"
+            return str(r)
 
         response = (
             f"🗺️ **Your Personalized Roadmap — {target_company} ({target_role})**\n\n"
@@ -138,7 +153,7 @@ async def roadmap_agent(state: AgentState, weeks_available: int = 8,
             + "\n\n".join(week_summaries)
             + f"\n\n...and {max(0, len(weeks)-3)} more weeks planned.\n\n"
             f"**Key Resources**:\n"
-            + "\n".join(f"• {r}" for r in result.get("resources", {}).get("dsa", [])[:3])
+            + "\n".join(f"• {format_resource(r)}" for r in result.get("resources", {}).get("dsa", [])[:3])
             + "\n\n💡 I've saved your full roadmap. Check the Roadmap section for the complete plan."
         )
 
