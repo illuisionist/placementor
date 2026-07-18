@@ -52,15 +52,24 @@ async def general_response_agent(state: AgentState) -> AgentState:
 
     chain = prompt | llm | StrOutputParser()
 
-    response = await chain.ainvoke({
-        "student_context": student_ctx,
-        "kb_context": kb_context,
-        "chat_history": history_str,
-        "user_message": state["user_message"],
-    })
+    try:
+        response = await chain.ainvoke({
+            "student_context": student_ctx,
+            "kb_context": kb_context,
+            "chat_history": history_str,
+            "user_message": state["user_message"],
+        })
 
-    return {
-        **state,
-        "final_response": response,
-        "suggested_next_action": "Is there anything specific you'd like me to help you with — resume review, mock interview, or roadmap?",
-    }
+        return {
+            **state,
+            "final_response": response,
+            "suggested_next_action": "Is there anything specific you'd like me to help you with — resume review, mock interview, or roadmap?",
+        }
+    except Exception as e:
+        import loguru
+        loguru.logger.error(f"[GeneralResponse] Failed: {e}")
+        return {
+            **state,
+            "error": f"General response failed: {str(e)}",
+            "final_response": "I'm having trouble connecting to my AI brain right now. Please try again in a few moments.",
+        }
