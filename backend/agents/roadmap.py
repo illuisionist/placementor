@@ -86,7 +86,7 @@ Respond ONLY with valid JSON:
     }}
 }}"""
 
-ROADMAP_USER = "Generate a personalized roadmap for the student."
+ROADMAP_USER = "User Request: {user_message}\n\nGenerate a personalized roadmap for the student. If the user specifies a particular target role (e.g. Data Engineer) or company in their request, override the default profile settings and tailor the roadmap specifically to their request."
 
 
 async def roadmap_agent(state: AgentState, weeks_available: int = 8,
@@ -120,6 +120,7 @@ async def roadmap_agent(state: AgentState, weeks_available: int = 8,
             "weeks_available": weeks_available,
             "target_company": target_company,
             "target_role": target_role,
+            "user_message": state.get("user_message", ""),
         })
 
         logger.info(f"[Roadmap] Generated {result.get('duration_weeks')} week roadmap for {target_company}")

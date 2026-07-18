@@ -174,7 +174,7 @@ function WeekCard({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
                 {week.checklist.map((item, i) => (
                   <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={item.is_completed} readOnly style={{ marginTop: 2, accentColor: '#f43f5e', flexShrink: 0 }} />
+                    <input type="checkbox" defaultChecked={item.is_completed} style={{ marginTop: 2, accentColor: '#f43f5e', flexShrink: 0 }} />
                     <span style={{ color: item.is_completed ? 'var(--text-2)' : 'var(--text)', textDecoration: item.is_completed ? 'line-through' : 'none', fontSize: 13, lineHeight: 1.4 }}>{item.task}</span>
                   </label>
                 ))}
