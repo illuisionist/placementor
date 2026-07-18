@@ -178,10 +178,6 @@ async def chat_stream(
                     yield f"data: {json.dumps({'type': 'token', 'content': buffer})}\n\n"
                     buffer = ""
 
-            # Send metadata
-            yield f"data: {json.dumps({'type': 'meta', 'intent': final_state.get('intent'), 'next_action': final_state.get('suggested_next_action')})}\n\n"
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
-
             # Save to memory
             await short_term_memory.append_message(user_id, "user", payload.message)
             await short_term_memory.append_message(user_id, "assistant", response_text)
@@ -201,6 +197,10 @@ async def chat_stream(
                 await _save_resume_review(db, user_id, final_state["resume_review"])
 
             await db.commit()
+
+            # Send metadata
+            yield f"data: {json.dumps({'type': 'meta', 'intent': final_state.get('intent'), 'next_action': final_state.get('suggested_next_action')})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
